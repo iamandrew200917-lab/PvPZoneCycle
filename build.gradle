@@ -1,51 +1,53 @@
-plugins { id 'java' }
+
+plugins {
+    id 'java'
+}
 
 group = 'com.gradercraft'
 version = '1.3.8'
+
 sourceSets {
-main {
-java {
-srcDirs = ['.']
-include 'PvPZoneCycle.java', 'PvPZoneRules.java'
-}
-resources {
-srcDirs = ['.']
-include 'plugin.yml', 'config.yml'
-}
-}
+    main {
+        java {
+            srcDirs = ['.']
+            include 'PvPZoneCycle.java', 'PvPZoneRules.java'
+        }
+        resources {
+            srcDirs = ['.']
+            include 'plugin.yml', 'config.yml'
+        }
+    }
 }
 
 repositories {
     mavenCentral()
-    maven { url = 'https://repo.papermc.io/repository/maven-public/' }
+    maven {
+        url = 'https://repo.papermc.io/repository/maven-public/'
+    }
 }
 
-// Compiled against the OLDEST supported Paper API (1.20.1) so the plugin only
-// references symbols that exist across the whole 1.20.1 -> 26.1.2 range.
-// Verify a newer API with, e.g., -PpaperApi=1.21.4-R0.1-SNAPSHOT.
 def paperApi = project.findProperty('paperApi') ?: '1.20.1-R0.1-SNAPSHOT'
+
 dependencies {
     compileOnly "io.papermc.paper:paper-api:${paperApi}"
 
-    // Server-independent logic (PvPZoneRules) is unit-tested with JUnit 5.
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
-// Newer Paper API variants publish a minimum JVM metadata attribute (21 for
-// 1.20.5-1.21.x, 25 for 26.x). When running a cross-version compile CHECK we
-// raise the resolution target so Gradle will hand us those variants; the
-// shipped bytecode stays Java 17 regardless. Default 17 keeps the normal
-// 1.20.1 ship build unchanged.
 def resolveJvm = (project.findProperty('resolveJvm') ?: '17') as Integer
+
 configurations.configureEach {
-    attributes {
-        attribute(org.gradle.api.attributes.java.TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, resolveJvm)
+    if (canBeResolved) {
+        attributes {
+            attribute(
+                org.gradle.api.attributes.java.TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE,
+                resolveJvm
+            )
+        }
     }
 }
 
-// Java 17 bytecode runs on Java 17 (MC 1.20.1-1.20.4), Java 21 (MC 1.20.5-1.21.11)
-// and Java 25 (MC 26.1.x) server JVMs. Build with any JDK >= 17.
 java {
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
@@ -53,8 +55,7 @@ java {
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
-    // Ship Java 17 bytecode. Compiling against a 26.x API requires JDK 25 and its
-    // class files are newer than 17, so only pin release 17 for the <=1.21 APIs.
+
     if (!paperApi.startsWith('26')) {
         options.release = 17
     }
@@ -62,7 +63,9 @@ tasks.withType(JavaCompile).configureEach {
 
 test {
     useJUnitPlatform()
-    testLogging { events 'passed', 'skipped', 'failed' }
+    testLogging {
+        events 'passed', 'skipped', 'failed'
+    }
 }
 
 jar {
@@ -70,14 +73,14 @@ jar {
     archiveVersion = project.version
 }
 
-// Helper for cross-version compatibility checks: dumps the resolved compile
-// classpath for the selected -PpaperApi so the main sources can be javac'd
-// with the matching JDK (17/21/25) outside Gradle.
 tasks.register('dumpCompileClasspath') {
     doLast {
         def f = file("${buildDir}/compile-classpath.txt")
         f.parentFile.mkdirs()
-        f.text = configurations.compileClasspath.files.collect { it.absolutePath }.join(File.pathSeparator)
+        f.text = configurations.compileClasspath.files.collect {
+            it.absolutePath
+        }.join(File.pathSeparator)
+
         println "Wrote compile classpath for paperApi=${paperApi} -> ${f}"
     }
 }
